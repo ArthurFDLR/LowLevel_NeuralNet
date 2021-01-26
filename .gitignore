@@ -1,0 +1,5 @@
+__pycache__
+**/*.so
+*.code-workspace
+venv/
+*.egg-info
