@@ -7,6 +7,5 @@ from .operations import (
     Flatten,
     Conv2d,
     Linear,
-    Show,
 )
 from .linker_cpp import Builder

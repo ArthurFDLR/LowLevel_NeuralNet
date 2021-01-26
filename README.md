@@ -38,3 +38,41 @@ As stated above, this library should mainly be used for experimentation. The ins
     `make test`
 
 _Note:_ Remember that you will have to rebuild the library after any modification!
+
+## How to use
+
+Here is a simple example of a Convolutional Neural Network pre-trained on the MNIST dataset - see [./example.py](./example.py) for the full code.
+
+```python
+# Define layers of the model
+layers = [
+   llnn.Conv2d("c1", 1, 8, 3),
+   llnn.ReLU(),
+   llnn.Conv2d("c2", 8, 8, 3),
+   llnn.ReLU(),
+   llnn.MaxPool2d(2, 2),
+   llnn.ReLU(),
+   llnn.Conv2d("c3", 8, 16, 3),
+   llnn.ReLU(),
+   llnn.Conv2d("c4", 16, 16, 3),
+   llnn.ReLU(),
+   llnn.MaxPool2d(2, 2),
+   llnn.Flatten(),
+   llnn.Linear("f", 16 * 4 * 4, 10),
+]
+
+# Build the model
+x = llnn.Input2d("images", 28, 28, 1)
+for layer in layers:
+   x = layer(x)
+
+# Import model parameters
+x.resolve(np.load("tests/data/mnist_params.npz"))
+# Compile the model
+CNN_model = x.compile(llnn.Builder())
+
+# Evaluation of the pre-trained model
+mnist_test = np.load("tests/data/mnist_test.npz")
+images = mnist_test["images"][:1000]
+labels_predicted = CNN_model(images=images).argmax(axis=1)
+```
