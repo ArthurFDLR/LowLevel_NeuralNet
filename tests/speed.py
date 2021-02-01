@@ -24,7 +24,7 @@ if __name__ == "__main__":
     x = llnn.Input2d("images", 28, 28, 1)
     for layer in layers:
         x = layer(x)
-    
+
     x.resolve(np.load("tests/data/mnist_params.npz"))
     mnist_test = np.load("tests/data/mnist_test.npz")
     images = mnist_test["images"][:10000]
@@ -36,7 +36,9 @@ if __name__ == "__main__":
     llnn_time = time.time()
     llnn_label = x.compile(llnn.Builder())(images=images).argmax(axis=1)
     llnn_time = time.time() - llnn_time
-    
+
     assert np.allclose(ref_label, llnn_label)
 
-    print(f"\nNumpy reference: {ref_time} seconds\nllnn: {llnn_time} seconds ({100.*(ref_time-llnn_time)/ref_time:.2f}% faster)")
+    print(
+        f"\nNumpy reference: {ref_time} seconds\nllnn: {llnn_time} seconds ({100.*(ref_time-llnn_time)/ref_time:.2f}% faster)"
+    )
