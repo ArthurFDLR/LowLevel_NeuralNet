@@ -39,6 +39,7 @@ public:
     tensor nhwc2nchw() const;
     tensor linear(tensor const &weight, tensor const &bias) const;
     tensor maxpool2d(tensor const &kernel_size, tensor const &stride) const;
+    tensor maxpool2d_bis(tensor const &kernel_size, tensor const &stride) const;
     tensor conv2d(tensor const &weight, tensor const &bias, tensor const &padding) const;
 
 private:

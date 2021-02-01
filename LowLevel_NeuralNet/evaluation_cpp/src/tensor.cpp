@@ -182,9 +182,11 @@ tensor tensor::mult_dim2(tensor const &t) const{
 
     for (size_t i = 0; i < new_shape[0]; i++){
         for (size_t j = 0; j < new_shape[1]; j++){
+            double v = 0.0;
             for (size_t k = 0; k < common_dim; k++){
-                out.at(i,j) += at(i,k) * t.at(k,j);
+                v += at(i,k) * t.at(k,j);
             }
+            out.at(i,j) = v;
         }
     }
     return out;
@@ -224,28 +226,30 @@ tensor tensor::flatten() const{
 }
 
 tensor tensor::nhwc2nchw() const{
-    int dim = get_dim();
-    assert(dim==4);
-    size_t shape[dim];
-    shape[0] = shape_[0];
-    shape[1] = shape_[3];
-    shape[2] = shape_[1];
-    shape[3] = shape_[2];
-    tensor out(dim, shape);
-    for (size_t n = 0; n < shape_[0]; n++)
+    assert(get_dim()==4);
+    size_t N = shape_[0];
+    size_t H = shape_[1];
+    size_t W = shape_[2];
+    size_t C = shape_[3];
+
+    tensor ret;
+    ret.shape_ = {N, C, H, W};
+    ret.data_.resize(N*C*H*W);
+
+    for (size_t n = 0; n < N; n++)
     {
-        for (size_t h = 0; h < shape_[1]; h++)
+        for (size_t h = 0; h < H; h++)
         {
-            for (size_t w = 0; w < shape_[2]; w++)
+            for (size_t w = 0; w < W; w++)
             {
-                for (size_t c = 0; c < shape_[3]; c++)
+                for (size_t c = 0; c < C; c++)
                 {
-                    out.at(position({n,c,h,w})) = at(position({n,h,w,c}));
+                    ret.data_[((n*C+c)*H+h)*W+w] = data_[((n*H+h)*W+w)*C+c];
                 }
             }
         }
     }
-    return out;
+    return ret;
 }
 
 tensor tensor::linear(tensor const &weight, tensor const &bias) const{
@@ -259,57 +263,58 @@ tensor tensor::linear(tensor const &weight, tensor const &bias) const{
     assert(weight.shape_[0] == O);
     assert(weight.shape_[1] == I);
 
-    size_t shape[] = {N,O};
-    tensor out(2, shape);
+    tensor ret;
+    ret.shape_ = {N, O};
+    ret.data_.resize(N*O);
 
     for (size_t n = 0; n < N; n++)
     {
         for (size_t o = 0; o < O; o++)
         {
-            out.at(n,o) += bias.at(o);
+            double v = bias.data_[o];
             for (size_t i = 0; i < I; i++)
             {
-                out.at(n,o) += weight.at(o,i) * at(n,i);
+                v += weight.data_[o*I + i] * data_[n*I + i];
             }
+            ret.data_[n*O + o] = v;
         }
     }
-    return out;
+    return ret;
 }
 
 tensor tensor::maxpool2d(tensor const &kernel_size, tensor const &stride) const{
     int dim = get_dim();
     size_t kernel_size_int = size_t(kernel_size.item());
     size_t stride_int = size_t(stride.item());
-    size_t shape[dim];
 
     assert(dim==4);
     assert((shape_[2] >= kernel_size_int) && (shape_[3] >= kernel_size_int));
 
-    shape[0] = shape_[0]; //N
-    shape[1] = shape_[1]; //C
-    shape[2] = shape_[2]/kernel_size_int; //H
-    shape[3] = shape_[3]/kernel_size_int; //W
-    tensor out(dim, shape);
+    size_t N = shape_[0];
+    size_t C = shape_[1];
+    size_t H = shape_[2]/kernel_size_int;
+    size_t W = shape_[3]/kernel_size_int;
+    tensor ret;
+    ret.shape_ = {N, C, H, W};
+    ret.data_.resize(N*C*H*W);
 
     size_t offset_h = (shape_[2] % kernel_size_int) / 2;
     size_t offset_w = (shape_[3] % kernel_size_int) / 2;
 
-    for (size_t n = 0; n < shape[0]; n++) 
+    for (size_t n = 0; n < N; ++n) 
     {
-        for (size_t c = 0; c < shape[1]; c++)
+        for (size_t c = 0; c < C; ++c)
         {   
-            for (size_t h = 0; h < shape[2]; h++)
+            for (size_t h = 0; h < H; ++h)
             {
-                for (size_t w = 0; w < shape[3]; w++)
+                for (size_t w = 0; w < W; ++w)
                 {
-                    size_t h_init = offset_h + h * stride_int;
-                    size_t w_init = offset_w + w * stride_int;
-                    out.at(position({n,c,h,w})) = get_pool_max(n, c, h_init, w_init, kernel_size_int);
+                    ret.at(position({n,c,h,w})) = get_pool_max(n, c, offset_h + h * stride_int, offset_w + w * stride_int, kernel_size_int);
                 }
             }
         }
     }
-    return out;
+    return ret;
 }
 
 double tensor::get_pool_max(size_t ax_0, size_t ax_1, size_t upl_h, size_t upl_w, size_t kernel_size) const{
@@ -318,13 +323,14 @@ double tensor::get_pool_max(size_t ax_0, size_t ax_1, size_t upl_h, size_t upl_w
     assert(upl_w + kernel_size <= shape_[3]);
 
     double max_value = std::numeric_limits<double>::lowest();
-    for (size_t h = upl_h; h < upl_h + kernel_size; h++)
+    for (size_t h = upl_h; h < upl_h + kernel_size; ++h)
     {
-        for (size_t w = upl_w; w < upl_w + kernel_size; w++)
+        for (size_t w = upl_w; w < upl_w + kernel_size; ++w)
         {
-            if (at(position({ax_0,ax_1,h,w})) > max_value)
+            double v = data_[((ax_0*shape_[1]+ax_1)*shape_[2]+h)*shape_[3]+w];
+            if (v > max_value)
             {
-                max_value = at(position({ax_0,ax_1,h,w}));
+                max_value = v;
             }
         }
     }
@@ -332,49 +338,34 @@ double tensor::get_pool_max(size_t ax_0, size_t ax_1, size_t upl_h, size_t upl_w
 }
 
 tensor tensor::conv2d(tensor const &weight, tensor const &bias, tensor const &padding) const{
-    int dim = get_dim();
     assert(size_t(padding.item()) == 0);
-    assert(dim==4);
     assert(weight.get_dim() == 4);
     assert(bias.get_dim() == 1);
     assert(bias.shape_[0] == weight.shape_[0]); // C_OUT
     assert(shape_[1] == weight.shape_[1]); //C_IN
 
-    size_t shape[dim];
+    tensor ret;
     size_t kernel_size = weight.shape_[2];
-    assert(weight.shape_[3] == kernel_size);
+    size_t N = shape_[0];
+    size_t OC = weight.shape_[0];
+    size_t HH = shape_[2] - kernel_size + 1;
+    size_t WW = shape_[3] - kernel_size + 1;
+    ret.shape_ = {N, OC, HH, WW};
+    ret.data_.resize(N*OC*HH*WW);
 
-    shape[0] = shape_[0]; //N
-    shape[1] = weight.shape_[0]; //C_OUT
-    shape[2] = shape_[2] - kernel_size + 1; //H
-    shape[3] = shape_[3] - kernel_size + 1; //W
-    tensor out(dim, shape);
+    size_t rHH = WW, rOC = rHH*HH, rN = rOC*OC;
 
-    for (size_t n = 0; n < shape[0]; n++) 
-    {
-        for (size_t c_out = 0; c_out < shape[1]; c_out++)
-        {   
-            for (size_t h_out = 0; h_out < shape[2]; h_out++)
-            {
-                for (size_t w_out = 0; w_out < shape[3]; w_out++)
+    for (size_t n = 0; n < N; ++n)
+        for (size_t oc = 0; oc < OC; ++oc)
+            for (size_t hh = 0; hh < HH; ++hh)
+                for (size_t ww = 0; ww < WW; ++ww)
                 {
-                    out.at(position({n,c_out,h_out,w_out})) = bias.at(c_out);
-
-                    for (size_t c_in = 0; c_in < shape_[1]; c_in++)
-                    {
-                        for (size_t k_h = 0; k_h < kernel_size; k_h++)
-                        {
-                            for (size_t k_w = 0; k_w < kernel_size; k_w++)
-                            {
-                                size_t h_in = h_out + k_h;
-                                size_t w_in = w_out + k_w;
-                                out.at(position({n,c_out,h_out,w_out})) += weight.at(position({c_out,c_in,k_h,k_w})) * at(position({n,c_in,h_in,w_in}));
-                            }
-                        }
-                    }
+                    double v = bias.data_[oc];
+                    for (size_t ic = 0; ic < shape_[1]; ++ic)
+                        for (size_t h = hh; h < hh+kernel_size; ++h)
+                            for (size_t w = ww; w < ww+kernel_size; ++w)
+                                v += data_[((n*shape_[1]+ic)*shape_[2]+h)*shape_[3]+w] * weight.data_[((oc*weight.shape_[1]+ic)*weight.shape_[2]+h-hh)*weight.shape_[3]+w-ww];
+                    ret.data_[n*rN+oc*rOC+hh*rHH+ww] = v;
                 }
-            }
-        }
-    }
-    return out;
+    return ret;
 }
