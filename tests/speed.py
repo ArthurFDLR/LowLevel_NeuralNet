@@ -1,3 +1,7 @@
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+from tensorflow.keras.models import load_model
 import numpy as np
 import LowLevel_NeuralNet as llnn
 import numpy_reference
@@ -27,18 +31,23 @@ if __name__ == "__main__":
 
     x.resolve(np.load("tests/data/mnist_params.npz"))
     mnist_test = np.load("tests/data/mnist_test.npz")
-    images = mnist_test["images"][:10000]
+    test_size = 1000
+    images = mnist_test["images"][:test_size]
+    labels = mnist_test["labels"][:test_size]
 
-    ref_time = time.time()
-    ref_label = x.compile(numpy_reference.Builder())(images=images).argmax(axis=1)
-    ref_time = time.time() - ref_time
+    np_time = time.time()
+    np_label = x.compile(numpy_reference.Builder())(images=images)
+    np_time = time.time() - np_time
 
     llnn_time = time.time()
-    llnn_label = x.compile(llnn.Builder())(images=images).argmax(axis=1)
+    llnn_label = x.compile(llnn.Builder())(images=images)
     llnn_time = time.time() - llnn_time
 
-    assert np.allclose(ref_label, llnn_label)
+    tf_model = load_model("tests/data/mnist_params.h5")
+    tf_time = time.time()
+    tf_label = tf_model.predict(images)
+    tf_time = time.time() - tf_time
 
-    print(
-        f"\nNumpy reference: {ref_time} seconds\nllnn: {llnn_time} seconds ({100.*(ref_time-llnn_time)/ref_time:.2f}% faster)"
-    )
+    print(f"Numpy time: {np_time:.4f}s")
+    print(f"TensorFlow time: {tf_time:.4f}s")
+    print(f"llnn time: {llnn_time:.4f}s")

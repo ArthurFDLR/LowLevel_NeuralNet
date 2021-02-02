@@ -3,3 +3,4 @@ __pycache__
 *.code-workspace
 venv/
 *.egg-info
+Archive/
