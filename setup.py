@@ -32,7 +32,6 @@ setuptools.setup(
         'dev': [
             'pytest',
             'black',
-            'tensorflow',
         ]
     }
 )
