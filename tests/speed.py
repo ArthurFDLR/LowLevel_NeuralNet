@@ -33,9 +33,11 @@ if __name__ == "__main__":
     x.resolve(np.load("tests/data/mnist_params.npz"))
     mnist_test = np.load("tests/data/mnist_test.npz")
 
-    with open('speed_results.csv', mode='w') as speed_file:
-        speed_writer = csv.writer(speed_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        speed_writer.writerow(['', 'Numpy', 'TensorFlow', 'llnn'])
+    with open("speed_results.csv", mode="w") as speed_file:
+        speed_writer = csv.writer(
+            speed_file, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL
+        )
+        speed_writer.writerow(["", "Numpy", "TensorFlow", "llnn"])
 
         for test_size in range(1, 65):
             print(test_size)
@@ -45,8 +47,8 @@ if __name__ == "__main__":
             np_time_sum = 0
             llnn_time_sum = 0
             tf_time_sum = 0
-            N=10
-            for i in range(N): # Mean computation time
+            N = 10
+            for i in range(N):  # Mean computation time
                 np_time = time.time()
                 np_label = x.compile(numpy_reference.Builder())(images=images)
                 np_time_sum += time.time() - np_time
